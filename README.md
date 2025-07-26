@@ -163,7 +163,7 @@ cp .env.example .env
 ### 3. Run the App
 
 ```bash
-go run main.go
+go run Delivery/main.go
 ```
 
 The API will be available at `http://localhost:8080`.
