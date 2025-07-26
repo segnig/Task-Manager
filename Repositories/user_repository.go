@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"fmt"
+	"log"
 
 	domain "github.com/segnig/task-manager/Domains"
 	"go.mongodb.org/mongo-driver/bson"
@@ -18,13 +19,13 @@ type userRepository struct {
 func (ur *userRepository) DeleteById(ctx context.Context, userId string) error {
 	collection := ur.database.Collection(ur.collection)
 
-	objID, err := primitive.ObjectIDFromHex(userId)
-	if err != nil {
-		return err
-	}
+	// objID, err := primitive.ObjectIDFromHex(userId)
+	// if err != nil {
+	// 	return err
+	// }
 
-	filter := bson.M{"task_id": objID}
-	_, err = collection.DeleteOne(ctx, filter)
+	filter := bson.M{"userid": userId}
+	_, err := collection.DeleteOne(ctx, filter)
 	return err
 }
 
@@ -52,14 +53,15 @@ func (ur *userRepository) FetchAll(ctx context.Context) ([]*domain.User, error) 
 func (ur *userRepository) FetchById(ctx context.Context, userId string) (*domain.User, error) {
 	collection := ur.database.Collection(ur.collection)
 
-	objID, err := primitive.ObjectIDFromHex(userId)
-	if err != nil {
-		return nil, err
-	}
+	// objID, err := primitive.ObjectIDFromHex(userId)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	filter := bson.M{"task_id": objID}
+	filter := bson.M{"userid": userId}
+	log.Println("UserID in code block: ", userId)
 	var user *domain.User
-	err = collection.FindOne(ctx, filter).Decode(&user)
+	err := collection.FindOne(ctx, filter).Decode(&user)
 
 	return user, err
 }
@@ -73,7 +75,7 @@ func (ur *userRepository) UpdateById(ctx context.Context, userId string, user *d
 		return err
 	}
 
-	filterStage := bson.M{"user_id": objId}
+	filterStage := bson.M{"userid": objId}
 	settingStage := bson.M{"$set": &user}
 
 	result, err := collection.UpdateOne(ctx, filterStage, settingStage)
@@ -86,6 +88,61 @@ func (ur *userRepository) UpdateById(ctx context.Context, userId string, user *d
 	}
 	return nil
 
+}
+
+func (ur *userRepository) Create(ctx context.Context, user *domain.User) error {
+	collection := ur.database.Collection(ur.collection)
+
+	filter := bson.M{"user_id": user.UserID}
+	count, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("user id '%s' already exists", user.UserID)
+	}
+	filter = bson.M{"username": user.Username}
+	count, err = collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("username '%s' already exists", user.Username)
+	}
+
+	totalUsers, err := collection.CountDocuments(ctx, bson.D{})
+
+	if err != nil {
+		return err
+	}
+
+	if totalUsers == 0 && user.UserType != "ADMIN" {
+		return fmt.Errorf("only an ADMIN can be the first user")
+	}
+	_, err = collection.InsertOne(ctx, user)
+	return err
+}
+
+func (ur *userRepository) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
+	collection := ur.database.Collection(ur.collection)
+
+	filter := bson.M{"username": username}
+	var user *domain.User
+	err := collection.FindOne(ctx, filter).Decode(&user)
+
+	return user, err
+}
+
+func (ur *userRepository) UpdateAllToken(ctx context.Context, signedToken, signedRefreshToken, UserID string) error {
+	user, err := ur.FetchById(ctx, UserID)
+	if err != nil {
+		return err
+	}
+
+	user.Token = signedToken
+	user.RefreshToken = signedRefreshToken
+	err = ur.UpdateById(ctx, UserID, user)
+	return err
 }
 
 func NewUserRepository(db mongo.Database, collection string) *userRepository {

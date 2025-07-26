@@ -8,10 +8,11 @@ import (
 )
 
 type PasswordProvider struct {
+	cost int
 }
 
 func (pp *PasswordProvider) HashPassword(userPassword string) string {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userPassword), 12)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userPassword), pp.cost)
 	if err != nil {
 		log.Println("error hashing password:", err)
 		return ""
@@ -27,6 +28,8 @@ func (pp *PasswordProvider) VerifyPassword(hashedPwd, plainPwd string) (bool, st
 	return true, ""
 }
 
-func NewPasswordProvider() domain.PasswordServiceProvider {
-	return &PasswordProvider{}
+func NewPasswordProvider(cost int) domain.PasswordServiceProvider {
+	return &PasswordProvider{
+		cost: cost,
+	}
 }

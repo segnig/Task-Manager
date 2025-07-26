@@ -27,14 +27,14 @@ type TaskRepository interface {
 	Create(ctx context.Context, task *Task) error
 	FetchAll(ctx context.Context) ([]*Task, error)
 	FetchById(ctx context.Context, taskId string) (*Task, error)
-	UpdateById(ctx context.Context, taskId string, task *Task) error
-	DeleteById(ctx context.Context, taskId string) error
+	UpdateById(ctx context.Context, taskId string, userID string, task *Task) error
+	DeleteById(ctx context.Context, taskId string, userId string) error
 }
 
 type TaskUsecase interface {
 	Create(ctx context.Context, task *Task) error
 	FetchAll(ctx context.Context) ([]*Task, error)
 	FetchById(ctx context.Context, taskId string) (*Task, error)
-	UpdateById(ctx context.Context, taskId string, task *Task) error
-	DeleteById(ctx context.Context, taskId string) error
+	UpdateById(ctx context.Context, taskId string, userID string, task *Task) error
+	DeleteById(ctx context.Context, taskId string, userID string) error
 }

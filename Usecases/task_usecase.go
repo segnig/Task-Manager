@@ -20,10 +20,10 @@ func (t *taskUsecase) Create(ctx context.Context, task *domain.Task) error {
 }
 
 // DeleteById implements domains.TaskUsecase.
-func (t *taskUsecase) DeleteById(ctx context.Context, taskId string) error {
+func (t *taskUsecase) DeleteById(ctx context.Context, taskId string, userID string) error {
 	c, cancel := context.WithTimeout(context.Background(), t.contextTimeout)
 	defer cancel()
-	return t.taskRepository.DeleteById(c, taskId)
+	return t.taskRepository.DeleteById(c, taskId, userID)
 }
 
 // FetchAll implements domains.TaskUsecase.
@@ -41,10 +41,10 @@ func (t *taskUsecase) FetchById(ctx context.Context, taskId string) (*domain.Tas
 }
 
 // UpdateById implements domains.TaskUsecase.
-func (t *taskUsecase) UpdateById(ctx context.Context, taskId string, task *domain.Task) error {
+func (t *taskUsecase) UpdateById(ctx context.Context, taskId string, userID string, task *domain.Task) error {
 	c, cancel := context.WithTimeout(context.Background(), t.contextTimeout)
 	defer cancel()
-	return t.taskRepository.UpdateById(c, taskId, task)
+	return t.taskRepository.UpdateById(c, taskId, userID, task)
 }
 
 func NewTaskUsecase(taskRepository domain.TaskRepository, contextTimeout time.Duration) domain.TaskUsecase {

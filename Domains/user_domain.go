@@ -25,11 +25,9 @@ type User struct {
 }
 
 type SignedDetails struct {
-	Username  string
-	FirstName string
-	LastName  string
-	Uid       string
-	UserType  string
+	Username string
+	Uid      string
+	UserType string
 	jwt.StandardClaims
 }
 
@@ -39,6 +37,8 @@ type UserRepository interface {
 	FetchById(ctx context.Context, userId string) (*User, error)
 	UpdateById(ctx context.Context, userId string, user *User) error
 	DeleteById(ctx context.Context, userId string) error
+	GetUserByUsername(ctx context.Context, username string) (*User, error)
+	UpdateAllToken(ctx context.Context, signedToken, signedRefreshToken, UserID string) error
 }
 
 type UserUsecase interface {
@@ -47,6 +47,8 @@ type UserUsecase interface {
 	FetchById(ctx context.Context, userId string) (*User, error)
 	UpdateById(ctx context.Context, userId string, user *User) error
 	DeleteById(ctx context.Context, userId string) error
+	GetUserByUsername(ctx context.Context, username string) (*User, error)
+	UpdateAllToken(ctx context.Context, signedToken, signedRefreshToken, UserID string) error
 }
 
 type PasswordServiceProvider interface {
@@ -54,8 +56,7 @@ type PasswordServiceProvider interface {
 	VerifyPassword(hashedPwd, plainPwd string) (bool, string)
 }
 
-type UserToken interface {
-	GenerateAllTokens(username, firstName, LastName, userType, UserID string) (signedToken, signedRefreshToken string, err error)
-	UpdateAllToken(signedToken, signedRefreshToken, UserID string)
-	ValidateToken(signedToken string) (claims *SignedDetails, msg string)
+type IUserToken interface {
+	GenerateAllTokens(username, userType, UserID string) (signedToken, signedRefreshToken string, err error)
+	ValidateToken(signedToken string) (claims *SignedDetails, err error)
 }

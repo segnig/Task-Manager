@@ -3,10 +3,10 @@ package repositories
 import (
 	"context"
 	"fmt"
+	"log"
 
 	domain "github.com/segnig/task-manager/Domains"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -32,15 +32,21 @@ func (tr *taskRepository) Create(ctx context.Context, task *domain.Task) error {
 }
 
 // DeleteById implements domains.TaskRepository.
-func (tr *taskRepository) DeleteById(ctx context.Context, taskId string) error {
+func (tr *taskRepository) DeleteById(ctx context.Context, taskId string, userID string) error {
 	collection := tr.database.Collection(tr.collection)
 
-	objID, err := primitive.ObjectIDFromHex(taskId)
+	filterStage := bson.M{"task_id": taskId}
+	var foundTask domain.Task
+	err := collection.FindOne(ctx, filterStage).Decode(&foundTask)
+
 	if err != nil {
-		return err
+		return fmt.Errorf("no task found with id '%s'", taskId)
+	}
+	if userID != foundTask.CreatedBy {
+		return fmt.Errorf("unauthorized to delete task")
 	}
 
-	filter := bson.M{"task_id": objID}
+	filter := bson.M{"task_id": taskId}
 	_, err = collection.DeleteOne(ctx, filter)
 	return err
 }
@@ -69,28 +75,38 @@ func (tr *taskRepository) FetchAll(ctx context.Context) ([]*domain.Task, error) 
 func (tr *taskRepository) FetchById(ctx context.Context, taskId string) (*domain.Task, error) {
 	collection := tr.database.Collection(tr.collection)
 
-	objID, err := primitive.ObjectIDFromHex(taskId)
-	if err != nil {
-		return nil, err
-	}
+	// objID, err := primitive.ObjectIDFromHex(taskId)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	filter := bson.M{"task_id": objID}
+	filter := bson.M{"task_id": taskId}
 	var task *domain.Task
-	err = collection.FindOne(ctx, filter).Decode(&task)
-
+	err := collection.FindOne(ctx, filter).Decode(&task)
+	log.Println(task)
 	return task, err
 }
 
 // UpdateById implements domains.TaskRepository.
-func (tr *taskRepository) UpdateById(ctx context.Context, taskId string, task *domain.Task) error {
+func (tr *taskRepository) UpdateById(ctx context.Context, taskId string, userID string, task *domain.Task) error {
 	collection := tr.database.Collection(tr.collection)
-	objId, err := primitive.ObjectIDFromHex(taskId)
+	// objId, err := primitive.ObjectIDFromHex(taskId)
+
+	// if err != nil {
+	// 	return err
+	// }
+
+	filterStage := bson.M{"task_id": taskId}
+	var foundTask domain.Task
+	err := collection.FindOne(ctx, filterStage).Decode(&foundTask)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("no task found with id '%s'", taskId)
+	}
+	if userID != foundTask.CreatedBy {
+		return fmt.Errorf("unauthorized to update task")
 	}
 
-	filterStage := bson.M{"task_id": objId}
 	settingStage := bson.M{"$set": &task}
 
 	result, err := collection.UpdateOne(ctx, filterStage, settingStage)

@@ -1,7 +1,9 @@
-package controllers
+package Controllers
 
 import (
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	domain "github.com/segnig/task-manager/Domains"
@@ -15,7 +17,7 @@ type TaskController struct {
 func (tc *TaskController) Create(c *gin.Context) {
 
 	var task domain.Task
-	err := c.ShouldBind(&task)
+	err := c.BindJSON(&task)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, domain.ErrorResponse{Message: err.Error()})
@@ -23,6 +25,16 @@ func (tc *TaskController) Create(c *gin.Context) {
 	}
 	task.ID = primitive.NewObjectID()
 	task.TaskID = task.ID.Hex()
+
+	task.CreatedAt = time.Now()
+	task.UpdatedAt = time.Now()
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		log.Panic("user_id not found in context")
+	}
+	task.CreatedBy = userID.(string)
+	task.UpdatedBy = userID.(string)
 
 	if err = tc.TaskUsecase.Create(c, &task); err != nil {
 		c.JSON(http.StatusBadRequest, domain.ErrorResponse{Message: err.Error()})
@@ -43,7 +55,7 @@ func (tc *TaskController) FetchAll(c *gin.Context) {
 }
 
 func (tc *TaskController) Fetch(c *gin.Context) {
-	taskID := c.GetString("task_id")
+	taskID := c.Param("task_id")
 
 	task, err := tc.TaskUsecase.FetchById(c, taskID)
 
@@ -55,16 +67,20 @@ func (tc *TaskController) Fetch(c *gin.Context) {
 }
 
 func (tc *TaskController) Update(c *gin.Context) {
-	taskID := c.GetString("task_id")
+	taskID := c.Param("task_id")
+	userID := c.GetString("user_id")
 
 	var task domain.Task
 
-	if err := c.ShouldBind(&task); err != nil {
+	if err := c.BindJSON(&task); err != nil {
 		c.JSON(http.StatusBadRequest, domain.ErrorResponse{Message: err.Error()})
 		return
 	}
 
-	if err := tc.TaskUsecase.UpdateById(c, taskID, &task); err != nil {
+	task.UpdatedBy = userID
+	task.UpdatedAt = time.Now()
+
+	if err := tc.TaskUsecase.UpdateById(c, taskID, userID, &task); err != nil {
 		c.JSON(http.StatusInternalServerError, domain.ErrorResponse{Message: err.Error()})
 		return
 	}
@@ -72,8 +88,9 @@ func (tc *TaskController) Update(c *gin.Context) {
 }
 
 func (tc *TaskController) Delete(c *gin.Context) {
-	taskID := c.GetString("task_id")
-	if err := tc.TaskUsecase.DeleteById(c, taskID); err != nil {
+	taskID := c.Param("task_id")
+	userID := c.GetString("user_id")
+	if err := tc.TaskUsecase.DeleteById(c, taskID, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, domain.ErrorResponse{Message: err.Error()})
 		return
 	}
