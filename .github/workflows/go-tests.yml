@@ -15,14 +15,14 @@ jobs:
         image: mongo:6.0
         ports:
           - 27017:27017
-        # No auth for simpler test setup
+        options: --health-cmd "mongosh --eval 'db.runCommand(\"ping\").ok'" --health-interval 5s --health-timeout 2s --health-retries 5
 
     strategy:
       matrix:
         test-file:
           - task_repository_test.go
           - user_repository_test.go
-          - task_usecase_test.go 
+          - task_usecase_test.go
           - user_usecase_test.go
 
     steps:
@@ -34,18 +34,25 @@ jobs:
           go-version: '1.21'
           cache: true
 
-      - name: Wait for MongoDB
-        run: sleep 5
+      - name: Wait for MongoDB to be ready
+        run: |
+          until docker exec mongodb mongosh --eval "db.runCommand('ping').ok" >/dev/null 2>&1; do
+            echo "Waiting for MongoDB..."
+            sleep 2
+          done
+          echo "MongoDB is ready!"
 
       - name: Run tests
         run: |
-          go test -v -timeout 2m ./Test/Respository_test/${{ matrix.test-file }}
+          cd Test/Repository_test/ || cd Test/Respository_test/ || true
+          go test -v -timeout 2m ./${{ matrix.test-file }}
         env:
-          TEST_DB_NAME: testdb_${{ github.run_id }}_${{ matrix.test-file }}
+          TEST_DB_NAME: "testdb_${{ github.run_id }}_${{ matrix.test-file }}"
+          TEST_MONGO_URI: "mongodb://localhost:27017"
 
       - name: Save test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # ✅ Updated to v4
         with:
           name: test-results-${{ matrix.test-file }}
           path: test-results-*.xml
