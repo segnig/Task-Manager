@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	domain "github.com/segnig/task-manager/Domains"
 	"go.mongodb.org/mongo-driver/bson"
@@ -90,27 +91,33 @@ func (tr *taskRepository) FetchById(ctx context.Context, taskId string) (*domain
 // UpdateById implements domains.TaskRepository.
 func (tr *taskRepository) UpdateById(ctx context.Context, taskId string, userID string, task *domain.Task) error {
 	collection := tr.database.Collection(tr.collection)
-	// objId, err := primitive.ObjectIDFromHex(taskId)
 
-	// if err != nil {
-	// 	return err
-	// }
-
-	filterStage := bson.M{"task_id": taskId}
-	var foundTask domain.Task
-	err := collection.FindOne(ctx, filterStage).Decode(&foundTask)
-
+	var existingTask domain.Task
+	err := collection.FindOne(ctx, bson.M{"task_id": taskId}).Decode(&existingTask)
 	if err != nil {
-		return fmt.Errorf("no task found with id '%s'", taskId)
+		if err == mongo.ErrNoDocuments {
+			return fmt.Errorf("no task found with id '%s'", taskId)
+		}
+		return err
 	}
-	if userID != foundTask.CreatedBy {
+
+	if userID != existingTask.CreatedBy {
 		return fmt.Errorf("unauthorized to update task")
 	}
 
-	settingStage := bson.M{"$set": &task}
+	update := bson.M{
+		"$set": bson.M{
+			"title":       task.Title,
+			"description": task.Description,
+			"updated_at":  time.Now(),
+		},
+	}
 
-	result, err := collection.UpdateOne(ctx, filterStage, settingStage)
-
+	result, err := collection.UpdateOne(
+		ctx,
+		bson.M{"task_id": taskId},
+		update,
+	)
 	if err != nil {
 		return err
 	}
@@ -118,7 +125,6 @@ func (tr *taskRepository) UpdateById(ctx context.Context, taskId string, userID 
 		return fmt.Errorf("no task found with id '%s'", taskId)
 	}
 	return nil
-
 }
 
 func NewTaskRepository(db mongo.Database, collection string) domain.TaskRepository {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	domain "github.com/segnig/task-manager/Domains"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -66,34 +66,33 @@ func (ur *userRepository) FetchById(ctx context.Context, userId string) (*domain
 	return user, err
 }
 
-// UpdateById implements domains.userRepository.
 func (ur *userRepository) UpdateById(ctx context.Context, userId string, user *domain.User) error {
 	collection := ur.database.Collection(ur.collection)
-	objId, err := primitive.ObjectIDFromHex(userId)
 
-	if err != nil {
-		return err
+	filter := bson.M{"userid": userId}
+
+	update := bson.M{
+		"$set": bson.M{
+			"updatedat": time.Now(),
+			"firstname": user.FirstName,
+			"lastname":  user.LastName,
+		},
 	}
 
-	filterStage := bson.M{"userid": objId}
-	settingStage := bson.M{"$set": &user}
-
-	result, err := collection.UpdateOne(ctx, filterStage, settingStage)
-
+	result, err := collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update user: %v", err)
 	}
 	if result.MatchedCount == 0 {
 		return fmt.Errorf("no task found with id '%s'", userId)
 	}
 	return nil
-
 }
 
 func (ur *userRepository) Create(ctx context.Context, user *domain.User) error {
 	collection := ur.database.Collection(ur.collection)
 
-	filter := bson.M{"user_id": user.UserID}
+	filter := bson.M{"userid": user.UserID}
 	count, err := collection.CountDocuments(ctx, filter)
 	if err != nil {
 		return err
@@ -134,15 +133,26 @@ func (ur *userRepository) GetUserByUsername(ctx context.Context, username string
 }
 
 func (ur *userRepository) UpdateAllToken(ctx context.Context, signedToken, signedRefreshToken, UserID string) error {
-	user, err := ur.FetchById(ctx, UserID)
+	update := bson.M{
+		"$set": bson.M{
+			"token":        signedToken,
+			"refreshtoken": signedRefreshToken,
+			"updatedat":    time.Now(),
+		},
+	}
+
+	result, err := ur.database.Collection(ur.collection).UpdateOne(
+		ctx,
+		bson.M{"userid": UserID},
+		update,
+	)
 	if err != nil {
 		return err
 	}
-
-	user.Token = signedToken
-	user.RefreshToken = signedRefreshToken
-	err = ur.UpdateById(ctx, UserID, user)
-	return err
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("no user found with id '%s'", UserID)
+	}
+	return nil
 }
 
 func NewUserRepository(db mongo.Database, collection string) *userRepository {

@@ -1,0 +1,51 @@
+name: Go Test Pipeline
+
+on:
+  push:
+    branches: [main, develop, test]
+  pull_request:
+    branches: [main, test]
+
+jobs:
+  unit-tests:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+        # No auth for simpler test setup
+
+    strategy:
+      matrix:
+        test-file:
+          - task_repository_test.go
+          - user_repository_test.go
+          - task_usecase_test.go 
+          - user_usecase_test.go
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Wait for MongoDB
+        run: sleep 5
+
+      - name: Run tests
+        run: |
+          go test -v -timeout 2m ./Test/Respository_test/${{ matrix.test-file }}
+        env:
+          TEST_DB_NAME: testdb_${{ github.run_id }}_${{ matrix.test-file }}
+
+      - name: Save test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.test-file }}
+          path: test-results-*.xml
